@@ -14,6 +14,7 @@ jobs:
           fetch-depth: 0
       - id: get_type
         run: echo $( git tag --points-at HEAD | grep -q -e '^.*@.*$' && echo 'type=::release::' || echo "type=::norelease::" ) >> "$GITHUB_OUTPUT"
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -23,12 +24,32 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: start-measurement
+
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+
       - run: npm install
       - run: npm run test
+
+      - name: Execution Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: get-measurement
+          label: "Test Execution"
+
+      - name: Save JSON Output
+        uses: actions/upload-artifact@v4
+        with:
+          name: eco-ci-results
+          path: eco_ci_output.json
+
   test_legacy:
     needs: [is_release]
     if: ${{ needs.is_release.outputs.type == '::norelease::' }}
@@ -40,10 +61,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: start-measurement
+
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+
       - run: |
           cwd=`pwd`
           for pkg in packages/*/package.json; do
@@ -51,54 +79,19 @@ jobs:
             npm install
             npm run test:legacy;
           done
-      # - run: |
-      #     echo 'Test csv generate'
-      #     cwd=`pwd`
-      #     cd $cwd/packages/csv-generate
-      #     npm install
-      #     npm run test:legacy
-      #     npm link
-      #     cd $pwd
-      # - run: |
-      #     echo 'Test stream transform'
-      #     cwd=`pwd`
-      #     cd $cwd/packages/stream-transform
-      #     npm install
-      #     npm link csv-generate
-      #     npm run test:legacy
-      #     npm link
-      #     cd $pwd
-      # - run: |
-      #     echo 'Test csv parse'
-      #     cwd=`pwd`
-      #     cd $cwd/packages/csv-parse
-      #     npm install
-      #     npm link csv-generate
-      #     npm link stream-transform
-      #     npm run test:legacy
-      #     npm link
-      #     cd $pwd
-      # - run: |
-      #     echo 'Test csv stringify'
-      #     cwd=`pwd`
-      #     cd $cwd/packages/csv-stringify
-      #     npm install
-      #     npm link csv-generate
-      #     npm run test:legacy
-      #     npm link
-      #     cd $pwd
-      # - run: |
-      #     echo 'Test csv'
-      #     cwd=`pwd`
-      #     cd $cwd/packages/csv
-      #     npm install
-      #     npm link csv-generate
-      #     npm link csv-parse
-      #     npm link csv-stringify
-      #     npm link stream-transform
-      #     npm run test:legacy
-      #     npm link
-      #     cd $pwd
+
+      - name: Execution Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: get-measurement
+          label: "Legacy Test Execution"
+
+      - name: Save JSON Output
+        uses: actions/upload-artifact@v4
+        with:
+          name: eco-ci-legacy-results
+          path: eco_ci_output.json
+
   publish:
     needs: [is_release, test]
     if: ${{ needs.is_release.outputs.type == '::release::' }}
@@ -107,11 +100,30 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: start-measurement
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22.x"
           registry-url: "https://registry.npmjs.org"
+
       - run: npm ci
       - run: npm run publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Execution Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: get-measurement
+          label: "Publish Execution"
+
+      - name: Save JSON Output
+        uses: actions/upload-artifact@v4
+        with:
+          name: eco-ci-publish-results
+          path: eco_ci_output.json
